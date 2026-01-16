@@ -32,3 +32,15 @@ class ContentAdmin(admin.ModelAdmin):
     list_display = ('title', 'creator', 'created_at')
   
     readonly_fields = ('created_at',)
+
+
+
+class ContentInline(admin.TabularInline):
+    model = Content
+    extra = 1  
+
+@admin.register(CreatorProfile)
+class CreatorProfileAdmin(admin.ModelAdmin):
+    list_display = ('user', 'subscription_price')
+    
+    inlines = [ContentInline]
