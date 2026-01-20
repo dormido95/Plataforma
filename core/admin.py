@@ -64,3 +64,14 @@ class SubscriptionAdmin(admin.ModelAdmin):
         return format_html('<b style="color:red;">Vencida</b>')
     
     status_tag.short_description = 'Estado'
+
+@admin.register(Content)
+class ContentAdmin(admin.ModelAdmin):
+    list_display = ('title', 'creator', 'created_at')
+    
+    date_hierarchy = 'created_at'
+
+@admin.register(Content)
+class ContentAdmin(admin.ModelAdmin):
+    save_on_top = True
+    save_as = True
