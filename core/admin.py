@@ -75,3 +75,19 @@ class ContentAdmin(admin.ModelAdmin):
 class ContentAdmin(admin.ModelAdmin):
     save_on_top = True
     save_as = True
+
+@admin.register(Subscription)
+class SubscriptionAdmin(admin.ModelAdmin):
+    list_per_page = 25  
+
+@admin.register(CreatorProfile)
+class CreatorProfileAdmin(admin.ModelAdmin):
+   
+    empty_value_display = "- No asignado -"
+@admin.register(Content)
+class ContentAdmin(admin.ModelAdmin):
+    
+    ordering = ('-created_at',)
+
+
+   
