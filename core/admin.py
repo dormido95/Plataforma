@@ -3,62 +3,98 @@ from django.contrib import admin
 from django.utils.html import format_html
 from .models import CreatorProfile, Content, Subscription
 
-# --- CONFIGURACIÓN GLOBAL ---
+# --- CONFIGURACIÓN DE INTERFAZ ---
 admin.site.site_header = "Plataforma Pro Admin"
-admin.site.index_title = "Gestión de Creadores"
+admin.site.index_title = "Gestión de Creadores y Suscripciones"
 
-# --- INLINES ---
-class ContentInline(admin.TabularInline):
+# --- FUNCIONES EXTRA ---
+
+# Filtro personalizado para el precio
+class PriceRangeFilter(admin.SimpleListFilter):
+    title = 'Rango de Precio'
+    parameter_name = 'price_range'
+    def lookups(self, request, model_admin):
+        return [('low', 'Barato (<10)'), ('mid', 'Medio (10-50)'), ('high', 'Premium (>50)')]
+    def queryset(self, request, queryset):
+        if self.value() == 'low': return queryset.filter(subscription_price__lt=10)
+        if self.value() == 'mid': return queryset.filter(subscription_price__gte=10, subscription_price__lte=50)
+        if self.value() == 'high': return queryset.filter(subscription_price__gt=50)
+
+@admin.action(description='Promoción: Precio a 1 USD')
+def set_promo_price(modeladmin, request, queryset):
+    queryset.update(subscription_price=1.00)
+
+# --- CLASES ADMIN ---
+
+class ContentInline(admin.TabularInline): 
     model = Content
-    extra = 0  # No crea filas vacías por defecto
+    extra = 0 # Para que no aparezcan filas vacías por defecto
     readonly_fields = ('created_at',)
-
-# --- MODELOS ---
 
 @admin.register(CreatorProfile)
 class CreatorProfileAdmin(admin.ModelAdmin):
-    # Columnas, edición rápida y el resumen de bio
-    list_display = ('user', 'subscription_price', 'bio_short')
-    list_editable = ('subscription_price',)
-    search_fields = ('user__username', 'user__email')
-    empty_value_display = "- No asignado -"
+    # ¿Qué columnas queremos ver en la tabla principal?
+    list_display = ('user', 'subscription_price', 'total_fans', 'bio_short')
     
-    # Inlines para ver el contenido del creador
+    # editar el precio sin entrar al perfil
+    list_editable = ('subscription_price',)
+    
+    # Filtros y búsquedas
+    list_filter = (PriceRangeFilter,)
+    search_fields = ('user__username', 'user__email')
+    
+    # Configuración de interfaz
     inlines = [ContentInline]
+    actions = [set_promo_price]
+    empty_value_display = "- No asignado -"
 
+    # Organización por secciones
+    fieldsets = (
+        ('Datos de Usuario', {'fields': ('user',)}),
+        ('Configuración de Perfil', {'fields': ('subscription_price',)}),
+        ('Biografía y Detalles', {'classes': ('collapse',), 'fields': ('bio',)}),
+    )
+
+    # Crearr "columnas inventadas"
     def bio_short(self, obj):
-        if obj.bio:
-            return obj.bio[:50] + "..."
-        return None
+        return obj.bio[:50] + "..." if obj.bio else None
     bio_short.short_description = 'Resumen de Bio'
 
-
-@admin.register(Content)
-class ContentAdmin(admin.ModelAdmin):
-    # fechas, orden y botones de guardado
-    list_display = ('title', 'creator', 'created_at')
-    list_filter = ('creator', 'created_at')
-    readonly_fields = ('created_at',)
-    ordering = ('-created_at',)
-    date_hierarchy = 'created_at'
-    save_on_top = True
-    save_as = True
-    search_fields = ('title', 'description')
+    def total_fans(self, obj):
+        return obj.subscription_set.count()
+    total_fans.short_description = 'Total Fans'
 
 
 @admin.register(Subscription)
 class SubscriptionAdmin(admin.ModelAdmin):
-    # semáforo de colores, paginación y filtros
     list_display = ('subscriber', 'creator', 'status_tag', 'end_date')
+    
+    # Carga los datos de usuario de un solo viaje a la DB
+    list_select_related = ('subscriber', 'creator__user')
+    
+    # Paginación y búsqueda
     list_per_page = 25
-    list_filter = ('end_date', 'creator')
     search_fields = ('subscriber__username', 'creator__user__username')
+    list_filter = ('end_date',)
 
     def status_tag(self, obj):
-        # El semáforo de colores 
         if obj.end_date > datetime.date.today():
             return format_html('<b style="color:green;">Activa</b>')
         return format_html('<b style="color:red;">Vencida</b>')
-    
     status_tag.short_description = 'Estado'
-   
+
+
+@admin.register(Content)
+class ContentAdmin(admin.ModelAdmin):
+    list_display = ('title', 'creator', 'created_at')
+    
+    # Filtros y navegación
+    list_filter = ('creator', 'created_at')
+    date_hierarchy = 'created_at'
+    search_fields = ('title', 'description')
+    
+    # Comportamiento del formulario
+    readonly_fields = ('created_at',)
+    ordering = ('-created_at',)
+    save_on_top = True
+    save_as = True
